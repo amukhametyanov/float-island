@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dreamy Low-Poly Floating Island Editor</title>
+    <link rel="stylesheet" href="style.css">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="scene-container"></div>
+    <div id="editor-ui">
+        <button id="btn-view-mode">View Mode</button>
+        <button id="btn-add-island">Add Island</button>
+        <button id="btn-add-tree">Add Tree</button>
+        <button id="btn-add-rock">Add Rock</button>
+        <p>Current Mode: <span id="current-mode-text">View</span></p>
+        <p>Instructions: Select an item to add, then Left Click to place. Islands can't overlap. Trees/Rocks place on islands.</p>
+    </div>
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

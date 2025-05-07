@@ -1,0 +1,50 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    background: linear-gradient(to bottom, #87CEEB 0%, #E0F2F7 70%, #D1C4E9 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    font-family: sans-serif;
+}
+
+#scene-container {
+    width: 100%;
+    height: 100%;
+    cursor: default; /* Default cursor */
+}
+
+#editor-ui {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    z-index: 10;
+}
+
+#editor-ui button {
+    margin: 5px;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    background-color: #f0f0f0;
+    cursor: pointer;
+    border-radius: 3px;
+}
+
+#editor-ui button:hover {
+    background-color: #e0e0e0;
+}
+
+#editor-ui button.active {
+    background-color: #a0c4ff; /* Light blue for active button */
+    font-weight: bold;
+}
+
+#editor-ui p {
+    margin: 5px 0;
+    font-size: 0.9em;
+}
