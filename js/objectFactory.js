@@ -79,23 +79,49 @@ export function createRockInstance(position) {
     return rock;
 }
 
-export function createCloudGroup() {
+export function createCloudGroup(isInitial = true, xRange = 120, yRange = 10, yBase = 15, zRange = 80, zOffset = -30) {
     const cloudGroup = new THREE.Group();
-    const numPuffs = Math.floor(Math.random() * 3) + 3;
+    const numPuffs = Math.floor(Math.random() * 4) + 4; // 4 to 7 puffs
     for (let j = 0; j < numPuffs; j++) {
-        const puffRadius = Math.random() * 1 + 0.8;
+        const puffRadius = Math.random() * 1.5 + 1.0; // Slightly larger puffs
         const puffGeometry = new THREE.IcosahedronGeometry(puffRadius, 0);
-        const puff = new THREE.Mesh(puffGeometry, cloudMaterial.clone()); // Clone material
+        // Each cloud instance should get its own material instance if we want to animate opacity individually later
+        const puff = new THREE.Mesh(puffGeometry, cloudMaterial.clone()); 
         puff.position.set(
-            (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 1, (Math.random() - 0.5) * 2
+            (Math.random() - 0.5) * 4, // Spread puffs horizontally within the cloud
+            (Math.random() - 0.5) * 1.5, // Spread puffs vertically slightly
+            (Math.random() - 0.5) * 3  // Spread puffs in depth slightly
         );
-        puff.castShadow = true;
+        puff.castShadow = true; // Soft shadows from clouds can be nice
         cloudGroup.add(puff);
     }
-    cloudGroup.position.set(
-        (Math.random() - 0.5) * 60, Math.random() * 8 + 12, (Math.random() - 0.5) * 50 - 20
-    );
-    addAnimatedObject(cloudGroup, 'cloud_drift', { speed: Math.random() * 0.3 + 0.1, initialX: cloudGroup.position.x, initialZ: cloudGroup.position.z});
+    
+    if (isInitial) {
+        // Spread initial clouds across the xRange
+        cloudGroup.position.set(
+            (Math.random() - 0.5) * xRange, 
+            Math.random() * yRange + yBase,      
+            (Math.random() - 0.5) * zRange + zOffset
+        );
+    } else {
+        // For recycled clouds, start them off-screen on the right
+        cloudGroup.position.set(
+            xRange / 2 + Math.random() * 10, // Start just off-screen right + some variation
+            Math.random() * yRange + yBase,      
+            (Math.random() - 0.5) * zRange + zOffset 
+        );
+    }
+    
+    // Store ranges for recycling
+    cloudGroup.userData.xRange = xRange;
+    cloudGroup.userData.yRange = yRange;
+    cloudGroup.userData.yBase = yBase;
+    cloudGroup.userData.zRange = zRange;
+    cloudGroup.userData.zOffset = zOffset;
+
+    addAnimatedObject(cloudGroup, 'cloud_drift', { 
+        speed: (Math.random() * 0.2 + 0.05) * (Math.random() < 0.5 ? 1 : -1) // Random speed and direction
+    });
     return cloudGroup;
 }
 

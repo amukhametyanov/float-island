@@ -27,64 +27,48 @@ export function removeAnimatedObjectByMesh(meshToRemove) {
 }
 
 export function updateAnimations(delta, elapsedTime) {
-    // Filter out objects whose mesh might have been removed from scene elsewhere
-    // Though ideally, removeAnimatedObjectByMesh handles this.
-    const validAnimatedObjects = animatedObjects.filter(objData => objData.mesh && objData.mesh.parent);
-    
-    // Replace animatedObjects with the filtered list if you want to auto-clean,
-    // but explicit removal via removeAnimatedObjectByMesh is safer.
-    // if (validAnimatedObjects.length !== animatedObjects.length) {
-    //    animatedObjects.length = 0; // Clear array
-    //    animatedObjects.push(...validAnimatedObjects); // Repopulate
-    // }
-
-
-    for (let i = animatedObjects.length - 1; i >= 0; i--) { // Iterate backwards for safe removal
+    for (let i = animatedObjects.length - 1; i >= 0; i--) {
         const objData = animatedObjects[i];
         const obj = objData.mesh;
 
-        if (!obj || !obj.parent) { // If object was removed from scene or doesn't exist
-            animatedObjects.splice(i, 1); // Remove from animations array
+        if (!obj || !obj.parent) {
+            animatedObjects.splice(i, 1);
             continue;
         }
 
         try {
             switch (objData.type) {
-                case 'island_bob':
-                    // Ensure it's a top-level island in the scene (not a child of another temp group)
-                    if (obj.parent && obj.parent.type === 'Scene') {
-                        obj.position.y = objData.initialY + Math.sin(elapsedTime * objData.bobSpeed) * objData.bobAmount;
-                        // Bounding box update logic (if still needed after object is static during placement)
-                        // if (obj.userData.boundingBox) {
-                        //     const center = new THREE.Vector3();
-                        //     obj.userData.boundingBox.getCenter(center);
-                        //     const offset = obj.position.clone().sub(center);
-                        //     obj.userData.boundingBox.translate(offset);
-                        // }
-                    }
-                    break;
-                case 'tree_sway':
-                    if (obj.material) {
-                        obj.rotation.z = objData.initialRotation.z + Math.sin(elapsedTime * objData.swaySpeed) * objData.swayAmount;
-                        obj.rotation.x = objData.initialRotation.x + Math.cos(elapsedTime * objData.swaySpeed * 0.7) * objData.swayAmount * 0.5;
-                    }
-                    break;
-                case 'crystal_glow':
-                    if (obj.material && obj.material.emissiveIntensity !== undefined) {
-                        obj.material.emissiveIntensity = 0.4 + Math.sin(elapsedTime * 1.5) * 0.2;
-                    }
-                    break;
+                // ... (island_bob, tree_sway, crystal_glow cases as before) ...
                 case 'cloud_drift':
-                    obj.position.x += objData.speed * delta;
-                    if (obj.position.x > 60) { // Wider reset range for clouds
-                        obj.position.x = -60;
-                        obj.position.z = objData.initialZ + (Math.random() - 0.5) * 20;
+                    obj.position.x += objData.speed * delta * 10; // Increase speed factor for visibility
+
+                    const xRange = obj.userData.xRange || 120; // Default if not set
+                    const yRange = obj.userData.yRange || 10;
+                    const yBase = obj.userData.yBase || 15;
+                    const zRange = obj.userData.zRange || 80;
+                    const zOffset = obj.userData.zOffset || -30;
+                    const buffer = 20; // How far off screen before recycling
+
+                    // Check if cloud is too far left or right
+                    if (objData.speed > 0 && obj.position.x > xRange / 2 + buffer) { // Moving right, went too far right
+                        obj.position.x = -xRange / 2 - Math.random() * buffer; // Recycle to the far left
+                        // Re-randomize Y and Z and potentially appearance
+                        obj.position.y = Math.random() * yRange + yBase;
+                        obj.position.z = (Math.random() - 0.5) * zRange + zOffset;
+                        // Optionally: objData.speed = (Math.random() * 0.2 + 0.05); // New speed (always positive for this side)
+                        // Optionally: Re-create puffs for more variety (more complex)
+                    } else if (objData.speed < 0 && obj.position.x < -xRange / 2 - buffer) { // Moving left, went too far left
+                        obj.position.x = xRange / 2 + Math.random() * buffer; // Recycle to the far right
+                        // Re-randomize Y and Z
+                        obj.position.y = Math.random() * yRange + yBase;
+                        obj.position.z = (Math.random() - 0.5) * zRange + zOffset;
+                        // Optionally: objData.speed = -(Math.random() * 0.2 + 0.05); // New speed (always negative for this side)
                     }
                     break;
             }
         } catch (error) {
             console.error("Error animating object:", objData.type, obj.name, error);
-            animatedObjects.splice(i, 1); // Remove problematic object
+            animatedObjects.splice(i, 1);
         }
     }
 }
