@@ -48,3 +48,8 @@ body {
     margin: 5px 0;
     font-size: 0.9em;
 }
+
+#editor-ui button#btn-remove-object.active {
+    background-color: #ff7961; /* Light red for active remove mode */
+    color: white;
+}
