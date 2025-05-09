@@ -4,7 +4,7 @@ import { initSceneAndCamera, initRenderer, initLights, createPlacementPlane, onW
 import { createIslandInstance, createCloudGroup, createTreeInstance } from './objectFactory.js'; // Assuming createInitialTrees exists or you add it
 import { updateAnimations, updateLightAnimation } from './animations.js';
 import { initCameraControls, updateCamera } from './cameraControls.js';
-import { initEditor } from './editor.js';
+import { initEditor, registerInitialIsland } from './editor.js';
 
 let scene, camera, renderer, directionalLight, clock;
 
@@ -16,6 +16,7 @@ function init() {
     const sceneCam = initSceneAndCamera();
     scene = sceneCam.scene;
     camera = sceneCam.camera;
+    window.scene = scene;
 
     renderer = initRenderer(sceneContainer);
     directionalLight = initLights(scene);
@@ -24,12 +25,7 @@ function init() {
     // Initial Objects
     const initialIsland = createIslandInstance(new THREE.Vector3(0, 0, 0));
     scene.add(initialIsland);
-    // Manually add to placedObjects if editor needs to know about it from start
-    // This part is tricky as placedObjects is in editor.js. 
-    // For simplicity, editor currently only knows what it places.
-    // To make editor aware of initial island for collision:
-    // 1. Export placedObjects from editor and add here (circular dependency risk)
-    // 2. Pass initialIsland to initEditor to register it. (Chosen below)
+    registerInitialIsland(initialIsland);
 
     // Example of adding some trees to the initial island:
     // This function would need to be added to objectFactory.js or be here

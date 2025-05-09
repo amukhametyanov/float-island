@@ -32,13 +32,14 @@ export function createIslandInstance(position) {
     islandBottom.userData.parentIslandGroup = islandGroup;
     islandGroup.add(islandBottom);
     
-    const crystalGeom = new THREE.IcosahedronGeometry(0.8, 0);
-    const crystal = new THREE.Mesh(crystalGeom, crystalMaterial.clone());
-    crystal.position.set(0, 1.5, 0);
-    crystal.castShadow = true;
-    crystal.name = "IslandCrystal";
-    islandGroup.add(crystal);
-    addAnimatedObject(crystal, 'crystal_glow');
+    // Remove crystal creation
+    // const crystalGeom = new THREE.IcosahedronGeometry(0.8, 0);
+    // const crystal = new THREE.Mesh(crystalGeom, crystalMaterial.clone());
+    // crystal.position.set(0, 1.5, 0);
+    // crystal.castShadow = true;
+    // crystal.name = "IslandCrystal";
+    // islandGroup.add(crystal);
+    // addAnimatedObject(crystal, 'crystal_glow');
 
     islandGroup.userData.boundingBox = new THREE.Box3().setFromObject(islandGroup);
     addAnimatedObject(islandGroup, 'island_bob', { initialY: islandGroup.position.y, bobSpeed: 0.4 + Math.random() * 0.2, bobAmount: 0.15 + Math.random() * 0.1 });

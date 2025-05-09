@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 
 // --- Speeds & Controls ---
-export const MOVE_SPEED = 5;
+export const MOVE_SPEED = 12; // Increased from 5 to 12 for faster navigation
 export const ROTATE_SPEED = 1.5;
 
 // --- Materials ---

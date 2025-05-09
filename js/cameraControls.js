@@ -16,10 +16,32 @@ const MOUSE_LOOK_SENSITIVITY_Y = 0.007;
 const MIN_ORBIT_DISTANCE = 5;
 const MAX_ORBIT_DISTANCE = 100;
 
+// --- First-person camera hierarchy ---
+let yawObject = null;
+let pitchObject = null;
+
 
 export function initCameraControls(camera, container) {
     cameraInstance = camera;
-    sceneContainerElement = container; // Store for mouse events
+    sceneContainerElement = container;
+
+    // Create yaw and pitch objects if not already created
+    if (!yawObject) {
+        yawObject = new THREE.Object3D();
+        pitchObject = new THREE.Object3D();
+        yawObject.add(pitchObject);
+        // Move yawObject to the initial camera position
+        yawObject.position.copy(camera.position);
+        // Reset camera position to origin relative to pitchObject
+        camera.position.set(0, 0, 0);
+        // Remove camera from its parent if needed
+        if (camera.parent) camera.parent.remove(camera);
+        pitchObject.add(cameraInstance);
+        // Add yawObject to the scene only if not already present
+        if (window.scene && !window.scene.children.includes(yawObject)) {
+            window.scene.add(yawObject);
+        }
+    }
 
     // Keyboard events on the container (or document/window if preferred)
     sceneContainerElement.addEventListener('keydown', onKeyDown);
@@ -37,6 +59,11 @@ export function initCameraControls(camera, container) {
 }
 
 function onKeyDown(event) {
+    // Prevent camera movement with Q/E or PageUp/PageDown only if window._disableCameraVertical is true
+    if (window._disableCameraVertical && (event.key.toLowerCase() === 'q' || event.key.toLowerCase() === 'e' || event.key === 'PageUp' || event.key === 'PageDown')) {
+        event.preventDefault();
+        return;
+    }
     keysPressed[event.key.toLowerCase()] = true;
     if (controlsActive && ["arrowup", "arrowdown", "arrowleft", "arrowright", "w", "s", "pageup", "pagedown"].includes(event.key.toLowerCase())) {
         event.preventDefault();
@@ -74,37 +101,17 @@ function onSceneMouseMove(event) {
     const deltaX = event.clientX - previousMousePosition.x;
     const deltaY = event.clientY - previousMousePosition.y;
 
-    // --- Simple Orbit Logic ---
-    // Get current vector from orbitPoint to camera
-    const offset = new THREE.Vector3().subVectors(cameraInstance.position, orbitPoint);
+    // Use yawObject for left/right, pitchObject for up/down
+    const yaw = -deltaX * 0.012;
+    const pitch = -deltaY * 0.012;
 
-    // Horizontal rotation (around world Y-axis, or camera's local Y if preferred for FPS style)
-    const theta = -deltaX * MOUSE_LOOK_SENSITIVITY_X;
-    offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), theta);
-
-    // Vertical rotation (around camera's local X-axis to avoid gimbal issues with world X)
-    // Need to get camera's right vector for axis of rotation
-    const phi = -deltaY * MOUSE_LOOK_SENSITIVITY_Y;
-    const cameraRight = new THREE.Vector3();
-    cameraInstance.getWorldDirection(cameraRight); // Gets forward vector
-    cameraRight.cross(cameraInstance.up); // Cross with up to get right vector
-    cameraRight.normalize();
-    
-    // Check to prevent flipping over the top/bottom
-    const currentAngleWithY = offset.angleTo(new THREE.Vector3(0,1,0));
-    const maxAngle = Math.PI - 0.1; //  don't go straight up/down
-    const minAngle = 0.1;
-
-    if ((phi > 0 && currentAngleWithY + phi < maxAngle) || (phi < 0 && currentAngleWithY + phi > minAngle)) {
-         offset.applyAxisAngle(cameraRight, phi);
+    if (yawObject && pitchObject) {
+        yawObject.rotation.y += yaw;
+        // Clamp pitch
+        const minPitch = -Math.PI / 2 + 0.15;
+        const maxPitch = Math.PI / 2 - 0.15;
+        pitchObject.rotation.x = Math.max(minPitch, Math.min(maxPitch, pitchObject.rotation.x + pitch));
     }
-
-
-    // Apply new offset to orbitPoint to get new camera position
-    cameraInstance.position.copy(orbitPoint).add(offset);
-
-    // Ensure camera always looks at the orbit point
-    cameraInstance.lookAt(orbitPoint);
 
     previousMousePosition.x = event.clientX;
     previousMousePosition.y = event.clientY;
@@ -127,51 +134,44 @@ export function setCameraControlsActive(isActive) {
 export function updateCamera(delta) {
     if (!controlsActive || !cameraInstance) return;
 
-    // Arrow Key / WASD Movement (Perspective Shift)
     const moveDistance = MOVE_SPEED * delta;
-    const direction = new THREE.Vector3();
-    cameraInstance.getWorldDirection(direction); // Gets the Z-axis direction camera is facing
 
-    // Forward / Backward (changes camera position and orbit point)
+    // Calculate movement directions based on yawObject (so movement is always flat relative to ground)
+    let forward = new THREE.Vector3(0, 0, -1); // Z- axis in Three.js
+    let right = new THREE.Vector3(1, 0, 0);    // X+ axis in Three.js
+    if (yawObject) {
+        // Transform directions by yawObject's rotation (ignoring pitch)
+        forward.applyQuaternion(yawObject.quaternion);
+        right.applyQuaternion(yawObject.quaternion);
+    }
+
+    // Zero out Y for flat movement
+    forward.y = 0;
+    right.y = 0;
+    forward.normalize();
+    right.normalize();
+
+    // Forward / Backward
     if (keysPressed['arrowup'] || keysPressed['w']) {
-        const moveVector = direction.clone().multiplyScalar(moveDistance);
-        cameraInstance.position.add(moveVector);
-        orbitPoint.add(moveVector); // Move the orbit point with the camera
+        yawObject.position.add(forward.clone().multiplyScalar(moveDistance));
     }
     if (keysPressed['arrowdown'] || keysPressed['s']) {
-        const moveVector = direction.clone().multiplyScalar(-moveDistance);
-        cameraInstance.position.add(moveVector);
-        orbitPoint.add(moveVector);
+        yawObject.position.add(forward.clone().multiplyScalar(-moveDistance));
     }
 
-    // Strafing (Left / Right - changes camera position and orbit point)
-    const strafeDirection = new THREE.Vector3();
-    strafeDirection.crossVectors(cameraInstance.up, direction).normalize(); // Get right vector (inverted for left)
-
-    if (keysPressed['arrowleft']) { // Assuming arrow left/right for strafe now
-        const moveVector = strafeDirection.clone().multiplyScalar(moveDistance);
-        cameraInstance.position.add(moveVector);
-        orbitPoint.add(moveVector);
+    // Strafing Left / Right
+    if (keysPressed['arrowleft'] || keysPressed['a']) {
+        yawObject.position.add(right.clone().multiplyScalar(-moveDistance));
     }
-    if (keysPressed['arrowright']) {
-        const moveVector = strafeDirection.clone().multiplyScalar(-moveDistance);
-        cameraInstance.position.add(moveVector);
-        orbitPoint.add(moveVector);
-    }
-    
-    // Up / Down (World Y-axis - changes camera position and orbit point)
-    if (keysPressed['pageup']) {
-        cameraInstance.position.y += moveDistance;
-        orbitPoint.y += moveDistance;
-    }
-    if (keysPressed['pagedown']) {
-        cameraInstance.position.y -= moveDistance;
-        orbitPoint.y -= moveDistance;
+    if (keysPressed['arrowright'] || keysPressed['d']) {
+        yawObject.position.add(right.clone().multiplyScalar(moveDistance));
     }
 
-    // Note: Simple yaw rotation with arrow keys is removed in favor of mouse orbit.
-    // If you still want arrow key yaw, you'd re-add:
-    // if (keysPressed['q']) cameraInstance.rotateY(rotateAngle); // Example 'q'
-    // if (keysPressed['e']) cameraInstance.rotateY(-rotateAngle); // Example 'e'
-    // But this conflicts with orbitPoint logic unless orbitPoint is also rotated or camera detaches.
+    // Up / Down (world Y axis)
+    if (!window._disableCameraVertical && (keysPressed['pageup'] || keysPressed['q'])) {
+        yawObject.position.y += moveDistance;
+    }
+    if (!window._disableCameraVertical && (keysPressed['pagedown'] || keysPressed['e'])) {
+        yawObject.position.y -= moveDistance;
+    }
 }

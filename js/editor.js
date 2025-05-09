@@ -31,6 +31,9 @@ const REMOVE_HIGHLIGHT_MATERIAL = new THREE.MeshStandardMaterial({
     // side: THREE.DoubleSide // if some objects are planes or have backfaces
 });
 
+// --- Island Placement Height Control ---
+let ghostIslandY = 0;
+
 
 export function initEditor(_scene, _camera, _placementPlane, _sceneContainer) {
     currentScene = _scene;
@@ -75,8 +78,8 @@ function setEditorMode(mode) {
         currentModeTextElement.textContent = mode.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
     updateActiveButton();
-    const isViewMode = (mode === 'view');
-    setCameraControlsActive(isViewMode);
+    // Always enable camera controls, even in placement/removal modes
+    setCameraControlsActive(true);
 
     if (ghostMesh) {
         currentScene.remove(ghostMesh);
@@ -88,7 +91,7 @@ function setEditorMode(mode) {
     let defaultCursor = 'default';
     if(sceneContainerElement) {
         defaultCursor = sceneContainerElement.getAttribute('data-default-cursor') || 'default';
-        if (isViewMode) { // Store current cursor only if going to view mode
+        if (mode === 'view') { // Store current cursor only if going to view mode
             sceneContainerElement.setAttribute('data-default-cursor', sceneContainerElement.style.cursor || defaultCursor);
         }
     }
@@ -105,11 +108,13 @@ function setEditorMode(mode) {
         if (sceneContainerElement) sceneContainerElement.style.cursor = 'crosshair';
     } else { 
         if (sceneContainerElement) {
-             if (isViewMode) sceneContainerElement.style.cursor = defaultCursor;
+             if (mode === 'view') sceneContainerElement.style.cursor = defaultCursor;
              else if (mode === 'removing_object') sceneContainerElement.style.cursor = 'pointer'; // Or a specific remove cursor
              else sceneContainerElement.style.cursor = defaultCursor; // Fallback
         }
     }
+
+    ghostIslandY = 0; // Reset ghost Y on mode change
 }
 
 function onEditorMouseMove(event) {
@@ -147,7 +152,7 @@ function onEditorMouseMove(event) {
         if (intersects.length > 0) {
             ghostMesh.visible = true;
             const intersectPoint = intersects[0].point;
-            ghostMesh.position.set(intersectPoint.x, 0, intersectPoint.z);
+            ghostMesh.position.set(intersectPoint.x, ghostIslandY, intersectPoint.z);
             
             const currentGhostBB = new THREE.Box3().setFromObject(ghostMesh);
             let isColliding = false;
@@ -185,7 +190,8 @@ function onEditorMouseMove(event) {
             ghostMesh.userData.targetIsland = intersect.object.userData.parentIslandGroup;
 
             if (editorMode === 'placing_tree') {
-                ghostMesh.position.y += 0.75;
+                // Place tree so its base sits on the surface, not below
+                ghostMesh.position.y = intersect.point.y + 0.75;
                 let canPlaceTree = true;
                 if (ghostMesh.userData.targetIsland) {
                     const targetIsland = ghostMesh.userData.targetIsland;
@@ -205,12 +211,30 @@ function onEditorMouseMove(event) {
                 const materialToUse = canPlaceTree ? ghostMaterial : collisionGhostMaterial;
                 ghostMesh.traverse(child => { if (child.isMesh) child.material = materialToUse; });
             } else { // placing_rock
-                ghostMesh.position.y += 0.25;
+                // Place rock so its base sits on the surface, not below
+                ghostMesh.position.y = intersect.point.y + 0.25;
                 ghostMesh.userData.canPlace = true;
                 ghostMesh.traverse(child => { if (child.isMesh) child.material = ghostMaterial; });
             }
         }
     }
+}
+
+// Listen for Q/E or PageUp/PageDown to move ghost island up/down
+if (!window._islandPlacementKeyListener) {
+    window._islandPlacementKeyListener = true;
+    window.addEventListener('keydown', function(event) {
+        if (editorMode === 'placing_island') {
+            if (event.key.toLowerCase() === 'q' || event.key === 'PageUp') {
+                ghostIslandY += 0.5;
+                if (ghostMesh) ghostMesh.position.y = ghostIslandY;
+            }
+            if (event.key.toLowerCase() === 'e' || event.key === 'PageDown') {
+                ghostIslandY -= 0.5;
+                if (ghostMesh) ghostMesh.position.y = ghostIslandY;
+            }
+        }
+    });
 }
 
 function onEditorMouseDown(event) {
@@ -233,7 +257,7 @@ function onEditorMouseDown(event) {
     const placementPosition = ghostMesh.position.clone(); 
 
     if (editorMode === 'placing_island') {
-        newObject = createIslandInstance(placementPosition);
+        newObject = createIslandInstance(ghostMesh.position.clone());
         currentScene.add(newObject);
         newObject.traverse(child => {
             if (child.isMesh) {
@@ -397,4 +421,11 @@ function removeObject(objectToRemove, type) {
     });
 
     console.log("Removed:", type, objectToRemove.name || 'Unnamed Object');
+}
+
+// Add this function to allow registering initial islands from main.js
+export function registerInitialIsland(islandGroup) {
+    if (!placedObjects.islands.includes(islandGroup)) {
+        placedObjects.islands.push(islandGroup);
+    }
 }
